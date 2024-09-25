@@ -1,41 +1,36 @@
 import { useContext, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { AppContext } from "../context/AppContext";
 import { assets } from "../assets/assets";
 import RelatedDoctors from "../components/RelatedDoctors";
+import { toast, ToastContainer } from "react-toastify";
 
 const Appointment = () => {
   const { docId } = useParams();
-  const { doctors, currencySymbol } = useContext(AppContext);
+  const { doctors, currencySymbol, bookAppointment } = useContext(AppContext); // Ensure correct context usage
   const daysOfWeek = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
   const [docInfo, setDocInfo] = useState(null);
   const [docSlots, setDocSlots] = useState([]);
   const [slotIndex, setSlotIndex] = useState(0);
   const [slotTime, setSlotTime] = useState("");
+  const navigate = useNavigate();
 
-  const fetchDocInfo = async () => {
-    const docInfo = doctors.find((doc) => doc._id === docId);
-    setDocInfo(docInfo);
+  const fetchDocInfo = () => {
+    const doctor = doctors.find((doc) => doc._id === docId);
+    setDocInfo(doctor); // Set doctor information
   };
 
-  const getAvailableSlots = async () => {
-    setDocSlots([]);
-
-    // getting current date
-
+  const getAvailableSlots = () => {
+    setDocSlots([]); // Reset slots
     let today = new Date();
 
     for (let i = 0; i < 7; i++) {
-      // getting Date with index
       let currentDate = new Date(today);
       currentDate.setDate(today.getDate() + i);
 
-      // setting end time of the date with index
-      let endTime = new Date();
-      endTime.setDate(today.getDate() + i);
+      let endTime = new Date(currentDate);
       endTime.setHours(21, 0, 0, 0);
 
-      // setting hours
       if (today.getDate() === currentDate.getDate()) {
         currentDate.setHours(
           currentDate.getHours() > 10 ? currentDate.getHours() + 1 : 10
@@ -52,20 +47,37 @@ const Appointment = () => {
         let formattedTime = currentDate.toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
-          hour12: true, // Ensure 'am'/'pm' is displayed
+          hour12: true,
         });
 
-        // Add slot to array
         timeSlots.push({
           dateTime: new Date(currentDate),
           time: formattedTime,
         });
 
-        // Increment current time passed by 30 minutes
-
         currentDate.setMinutes(currentDate.getMinutes() + 30);
       }
       setDocSlots((prev) => [...prev, timeSlots]);
+    }
+  };
+
+  const handleBookAppointment = () => {
+    if (slotTime) {
+      const appointmentDetails = {
+        doctor: docInfo.name,
+        date: docSlots[slotIndex][0].dateTime.toLocaleDateString(),
+        time: slotTime,
+        price: docInfo.fees,
+      };
+
+      bookAppointment(appointmentDetails); // Book the appointment
+      toast.success("Appointment Booked Successfully! Redirecting to My Appointments...");
+
+      setTimeout(() => {
+        navigate("/my-appointments"); // Navigate to MyAppointments page after a short delay
+      }, 3000); // Redirect after 3 seconds to allow the user to see the success message
+    } else {
+      toast.error("Please select a time slot.");
     }
   };
 
@@ -74,28 +86,24 @@ const Appointment = () => {
   }, [doctors, docId]);
 
   useEffect(() => {
-    getAvailableSlots();
+    if (docInfo) {
+      getAvailableSlots();
+    }
   }, [docInfo]);
-
-  useEffect(() => {
-    console.log(docSlots);
-  }, [docSlots]);
 
   return (
     docInfo && (
       <div>
-        {/* ------- Doctor Details -------- */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div>
             <img
               className="bg-primary w-full sm:max-w-72 rounded-lg"
               src={docInfo.image}
-              alt=""
+              alt={docInfo.name}
             />
           </div>
 
           <div className="flex-1 border border-gray-400 rounded-lg p-8 py-7 bg-white mx-2 sm:mx-0 mt-[-80px] sm:mt-0">
-            {/* ------- Doc Info: name, degree, experience ------- */}
             <p className="flex items-center gap-2 text-2xl font-medium text-gray-900">
               {docInfo.name}
               <img
@@ -113,7 +121,6 @@ const Appointment = () => {
               </button>
             </div>
 
-            {/* ----- Doctor About ----- */}
             <div>
               <p className="flex items-center gap-1 text-sm font-medium text-gray-900 mt-3">
                 About
@@ -133,11 +140,10 @@ const Appointment = () => {
           </div>
         </div>
 
-        {/* -----------  Booking Slots  ------------ */}
         <div className="sm:ml-72 sm:pl-4 mt-4 font-medium text-gray-700">
           <p>Booking slots</p>
           <div className="flex gap-3 items-center w-full overflow-x-scroll mt-4">
-            {docSlots.length &&
+            {docSlots.length > 0 &&
               docSlots.map((item, index) => (
                 <div
                   onClick={() => setSlotIndex(index)}
@@ -155,7 +161,7 @@ const Appointment = () => {
           </div>
 
           <div className="flex items-c gap-3 w-full overflow-x-scroll mt-4">
-            {docSlots.length &&
+            {docSlots.length > 0 &&
               docSlots[slotIndex].map((item, index) => (
                 <p
                   onClick={() => setSlotTime(item.time)}
@@ -170,7 +176,22 @@ const Appointment = () => {
                 </p>
               ))}
           </div>
-          <button className="bg-primary text-white text-sm font-light px-14 py-3 rounded-full my-6">Book an Appointment</button>
+          <button
+            onClick={handleBookAppointment}
+            className="bg-primary text-white text-sm font-light px-14 py-3 rounded-full my-6"
+          >
+            Book Appointment
+          </button>
+
+          <ToastContainer
+            position="top-right"
+            autoClose={3000}
+            hideProgressBar={false}
+            closeOnClick
+            pauseOnHover
+            draggable
+            pauseOnFocusLoss
+          />
         </div>
 
         {/* ------ Listing related doctors -------- */}
@@ -181,3 +202,4 @@ const Appointment = () => {
 };
 
 export default Appointment;
+
